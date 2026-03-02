@@ -2,7 +2,7 @@ import express from "express";
 import { signupPostRequestSchema, loginPostRequestSchema } from "../validation/request.validation.js";
 import { hashPasswordWithSalt } from "../utils/hash.js";
 import { getUserByEmail, createUser } from "../services/users.service.js";
-import jwt from "jsonwebtoken";
+import { createUserToken } from "../utils/token.js";
 
 
 
@@ -46,13 +46,12 @@ router.post('/login', async (req, res) => {
         return res.status(400).json({ error: "User not found" });
     }
 
-
     const { password: hashedPasswordFromUser } = hashPasswordWithSalt(password, user.salt);
 
     if (user.password !== hashedPasswordFromUser) {
         return res.status(400).json({ error: "Invalid password" });
     }
-    const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    const token = await createUserToken({ id: user.id });
     return res.status(200).json({ data: { token } });
 })
 export default router;
