@@ -1,9 +1,10 @@
 import express from "express";
-import { db } from "../db/index.js";
-import { usersTable } from "../model/user.model.js";
-import { eq } from "drizzle-orm";
-import { randomBytes, createHmac } from "crypto";
-import { signupPostRequestSchema } from "../validation/request.validation.js";
+import { signupPostRequestSchema, loginPostRequestSchema } from "../validation/request.validation.js";
+import { hashPasswordWithSalt } from "../utils/hash.js";
+import { getUserByEmail, createUser } from "../services/users.service.js";
+import jwt from "jsonwebtoken";
+
+
 
 const router = express.Router();
 
@@ -14,37 +15,44 @@ router.post('/signup', async (req, res) => {
     }
 
     const { firstName, lastName, email, password } = validationResult.data;
-
-
-    // without zod
-    // if (!firstName) return res.status(400).json({ message: "First name is required" });
-    // if (!lastName) return res.status(400).json({ message: "Last name is required" });
-    // if (!email) return res.status(400).json({ message: "Email is required" });
-    // if (!password) return res.status(400).json({ message: "Password is required" });
-
-    const [existingUser] = await db
-        .select({ id: usersTable.id })
-        .from(usersTable)
-        .where(eq(usersTable.email, email));
+    const existingUser = await getUserByEmail(email);
 
     if (existingUser) {
         return res.status(400).json({ error: "User already exists" });
-
     }
-    const salt = randomBytes(256).toString("hex");
-    const hashedPassword = createHmac("sha256", salt).update(password).digest("hex");
+    const { salt, password: hashedPassword } = hashPasswordWithSalt(password);
 
-
-
-    const [user] = await db.insert(usersTable).values({
+    const user = await createUser({
         firstName,
         lastName,
         email,
         password: hashedPassword,
-        salt,
-    }).returning({ id: usersTable.id });
+        salt
+    });
 
     return res.status(201).json({ data: { id: user.id } });
 })
 
+router.post('/login', async (req, res) => {
+    const validationResult = await loginPostRequestSchema.safeParseAsync(req.body);
+    if (validationResult.error) {
+        return res.status(400).json({ error: validationResult.error.format() });
+    }
+
+    const { email, password } = validationResult.data;
+    const user = await getUserByEmail(email);
+
+    if (!user) {
+        return res.status(400).json({ error: "User not found" });
+    }
+
+
+    const { password: hashedPasswordFromUser } = hashPasswordWithSalt(password, user.salt);
+
+    if (user.password !== hashedPasswordFromUser) {
+        return res.status(400).json({ error: "Invalid password" });
+    }
+    const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    return res.status(200).json({ data: { token } });
+})
 export default router;
