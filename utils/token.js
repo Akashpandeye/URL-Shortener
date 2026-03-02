@@ -20,6 +20,6 @@ export const validateUserToken = async (token) => {
         const payload = jwt.verify(token, JWT_SECRET);
         return payload;
     } catch (error) {
-        throw new Error(error);
+        return null
     }
 }
