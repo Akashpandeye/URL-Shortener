@@ -44,7 +44,8 @@ export default async function handler(req, res) {
         console.error("Signup error:", error);
         return res.status(500).json({ 
             error: "Internal Server Error", 
-            message: error.message || String(error)
+            message: error.message || String(error),
+            cause: error.cause ? String(error.cause) : undefined
         });
     }
 }

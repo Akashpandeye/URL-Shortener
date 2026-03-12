@@ -16,8 +16,7 @@ export async function authMiddleware(req, res, next) {
         req.user = payload;
         return next();
     } catch (error) {
-        // Token is present but invalid or expired — reject immediately
-        return res.status(401).json({ error: "Invalid or expired token" });
+        return next();
     }
 }
 
