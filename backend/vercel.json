@@ -1,0 +1,40 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/**/*.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/users/signup",
+      "dest": "/api/users/signup.js"
+    },
+    {
+      "src": "/api/users/login",
+      "dest": "/api/users/login.js"
+    },
+    {
+      "src": "/api/shorten",
+      "dest": "/api/shorten.js"
+    },
+    {
+      "src": "/api/codes",
+      "dest": "/api/codes.js"
+    },
+    {
+      "src": "/api/(?<id>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})",
+      "dest": "/api/[id].js"
+    },
+    {
+      "src": "/api/(?<shortCode>[^/]+)",
+      "dest": "/api/[shortCode].js"
+    }
+  ],
+  "env": {
+    "DATABASE_URL": "@database_url",
+    "JWT_SECRET": "@jwt_secret",
+    "FRONTEND_URL": "@frontend_url"
+  }
+}

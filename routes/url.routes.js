@@ -30,35 +30,61 @@ router.post('/shorten', authMiddleware, ensureAuth, async function (req, res) {
 })
 
 router.get('/codes', ensureAuth, async function (req, res) {
-    const result = await db.select({
-        shortCode: urlTable.shortCode,
-        targetUrl: urlTable.targetUrl,
-        id: urlTable.id,
-        createdAt: urlTable.createdAt,
-        updatedAt: urlTable.updatedAt
-    }).from(urlTable).where(eq(urlTable.userId, req.user.id));
-    return res.status(200).json({ data: { result } });
+    try {
+        const result = await db.select({
+            shortCode: urlTable.shortCode,
+            targetUrl: urlTable.targetUrl,
+            id: urlTable.id,
+            createdAt: urlTable.createdAt,
+            updatedAt: urlTable.updatedAt
+        }).from(urlTable).where(eq(urlTable.userId, req.user.id));
+        return res.status(200).json({ data: { result } });
+    } catch (error) {
+        return res.status(500).json({ error: "Failed to retrieve URLs" });
+    }
 })
 
 router.delete('/:id', ensureAuth, async function (req, res) {
     const id = req.params.id;
-    const [result] = await db.delete(urlTable).where(and(eq(urlTable.id, id), eq(urlTable.userId, req.user.id))).returning({
-        shortCode: urlTable.shortCode,
-        targetUrl: urlTable.targetUrl
-    });
-    return res.status(200).json({ data: { result } });
+    // Validate UUID format before hitting the DB
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(id)) {
+        return res.status(400).json({ error: "Invalid ID format" });
+    }
+    try {
+        const [result] = await db.delete(urlTable).where(and(eq(urlTable.id, id), eq(urlTable.userId, req.user.id))).returning({
+            shortCode: urlTable.shortCode,
+            targetUrl: urlTable.targetUrl
+        });
+        if (!result) {
+            return res.status(404).json({ error: "URL not found or you do not have permission" });
+        }
+        return res.status(200).json({ data: { result } });
+    } catch (error) {
+        return res.status(500).json({ error: "Failed to delete URL" });
+    }
 })
 
 router.get('/:shortCode', async function (req, res) {
     const code = req.params.shortCode;
-    const [result] = await db.select({
-        targetUrl: urlTable.targetUrl
-    }).from(urlTable).where(eq(urlTable.shortCode, code));
 
-    if (!result) {
-        return res.status(404).json({ error: "URL not found" });
+    // Ignore browser auto-requests like favicon.ico
+    if (code === 'favicon.ico') {
+        return res.status(204).end();
     }
-    return res.redirect(result.targetUrl);
+
+    try {
+        const [result] = await db.select({
+            targetUrl: urlTable.targetUrl
+        }).from(urlTable).where(eq(urlTable.shortCode, code));
+
+        if (!result) {
+            return res.status(404).json({ error: "URL not found" });
+        }
+        return res.redirect(result.targetUrl);
+    } catch (error) {
+        return res.status(500).json({ error: "Failed to resolve short URL" });
+    }
 })
 
 export default router;
