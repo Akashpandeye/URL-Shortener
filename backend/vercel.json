@@ -31,10 +31,5 @@
       "src": "/api/(?<shortCode>[^/]+)",
       "dest": "/api/[shortCode].js"
     }
-  ],
-  "env": {
-    "DATABASE_URL": "@database_url",
-    "JWT_SECRET": "@jwt_secret",
-    "FRONTEND_URL": "@frontend_url"
-  }
+  ]
 }

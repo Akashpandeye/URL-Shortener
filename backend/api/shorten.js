@@ -16,30 +16,34 @@ export default async function handler(req, res) {
         return res.status(405).json({ error: "Method not allowed" });
     }
 
-    // Auth middleware
-    const { user, authError } = await runAuthMiddleware(req.headers);
-    if (authError) {
-        return res.status(401).json({ error: authError });
-    }
-
-    // ensureAuth guard
-    const authGuard = ensureAuth(user);
-    if (authGuard) {
-        return res.status(401).json(authGuard);
-    }
-
-    const validationResult = await shortendPostRequestBodySchema.safeParseAsync(req.body);
-    if (validationResult.error) {
-        return res.status(400).json({ error: validationResult.error.format() });
-    }
-
-    const { url, code } = validationResult.data;
-    const shortCode = code ?? nanoid(6);
-
     try {
+        // Auth middleware
+        const { user, authError } = await runAuthMiddleware(req.headers);
+        if (authError) {
+            return res.status(401).json({ error: authError });
+        }
+
+        // ensureAuth guard
+        const authGuard = ensureAuth(user);
+        if (authGuard) {
+            return res.status(401).json(authGuard);
+        }
+
+        const validationResult = await shortendPostRequestBodySchema.safeParseAsync(req.body);
+        if (validationResult.error) {
+            return res.status(400).json({ error: validationResult.error.format() });
+        }
+
+        const { url, code } = validationResult.data;
+        const shortCode = code ?? nanoid(6);
+
         const result = await createUrl(url, shortCode, user.id);
         return res.status(201).json({ data: { result } });
     } catch (error) {
-        return res.status(400).json({ error: "Short code already exists or invalid data provided" });
+        console.error("Shorten URL error:", error);
+        if (error.code === '23505') { // Postgres unique violation (shortCode exists)
+            return res.status(400).json({ error: "Short code already exists" });
+        }
+        return res.status(500).json({ error: "Internal Server Error", message: error.message || String(error) });
     }
 }

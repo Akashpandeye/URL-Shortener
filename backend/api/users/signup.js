@@ -16,27 +16,35 @@ export default async function handler(req, res) {
         return res.status(405).json({ error: "Method not allowed" });
     }
 
-    const validationResult = await signupPostRequestSchema.safeParseAsync(req.body);
-    if (validationResult.error) {
-        return res.status(400).json({ error: validationResult.error.format() });
+    try {
+        const validationResult = await signupPostRequestSchema.safeParseAsync(req.body);
+        if (validationResult.error) {
+            return res.status(400).json({ error: validationResult.error.format() });
+        }
+
+        const { firstName, lastName, email, password } = validationResult.data;
+
+        const existingUser = await getUserByEmail(email);
+        if (existingUser) {
+            return res.status(400).json({ error: "User already exists" });
+        }
+
+        const { salt, password: hashedPassword } = hashPasswordWithSalt(password);
+
+        const user = await createUser({
+            firstName,
+            lastName,
+            email,
+            password: hashedPassword,
+            salt,
+        });
+
+        return res.status(201).json({ data: { id: user.id } });
+    } catch (error) {
+        console.error("Signup error:", error);
+        return res.status(500).json({ 
+            error: "Internal Server Error", 
+            message: error.message || String(error)
+        });
     }
-
-    const { firstName, lastName, email, password } = validationResult.data;
-
-    const existingUser = await getUserByEmail(email);
-    if (existingUser) {
-        return res.status(400).json({ error: "User already exists" });
-    }
-
-    const { salt, password: hashedPassword } = hashPasswordWithSalt(password);
-
-    const user = await createUser({
-        firstName,
-        lastName,
-        email,
-        password: hashedPassword,
-        salt,
-    });
-
-    return res.status(201).json({ data: { id: user.id } });
 }

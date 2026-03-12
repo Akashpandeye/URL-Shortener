@@ -41,6 +41,17 @@ const authHeaders = (token?: string | null): Record<string, string> => {
   return { "Content-Type": "application/json" };
 };
 
+// Safe JSON parser — backend may return plain-text 500 errors
+async function safeJson(res: Response): Promise<Record<string, unknown>> {
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    // Backend returned non-JSON (e.g. "Internal Server Error")
+    return { error: `Server error (${res.status}): ${text.slice(0, 120)}` };
+  }
+}
+
 // === Auth API ===
 
 export async function apiSignup(data: {
@@ -54,8 +65,8 @@ export async function apiSignup(data: {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
-  const json = await res.json();
-  if (!res.ok) throw new Error(json.error || "Signup failed");
+  const json = await safeJson(res);
+  if (!res.ok) throw new Error((json.error as string) || "Signup failed");
   return json.data as { id: string };
 }
 
@@ -65,8 +76,8 @@ export async function apiLogin(data: { email: string; password: string }) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
-  const json = await res.json();
-  if (!res.ok) throw new Error(json.error || "Login failed");
+  const json = await safeJson(res);
+  if (!res.ok) throw new Error((json.error as string) || "Login failed");
   return json.data as { token: string };
 }
 
@@ -78,9 +89,9 @@ export async function apiShortenUrl(data: CreateUrlPayload) {
     headers: authHeaders(),
     body: JSON.stringify(data),
   });
-  const json = await res.json();
-  if (!res.ok) throw new Error(json.error || "Failed to shorten URL");
-  return json.data.result as ShortLink;
+  const json = await safeJson(res);
+  if (!res.ok) throw new Error((json.error as string) || "Failed to shorten URL");
+  return (json.data as any)?.result as ShortLink;
 }
 
 export async function apiGetCodes() {
@@ -88,9 +99,9 @@ export async function apiGetCodes() {
     method: "GET",
     headers: authHeaders(),
   });
-  const json = await res.json();
-  if (!res.ok) throw new Error(json.error || "Failed to fetch URLs");
-  return json.data.result as ShortLink[];
+  const json = await safeJson(res);
+  if (!res.ok) throw new Error((json.error as string) || "Failed to fetch URLs");
+  return (json.data as any)?.result as ShortLink[];
 }
 
 export async function apiDeleteUrl(id: string) {
@@ -98,7 +109,7 @@ export async function apiDeleteUrl(id: string) {
     method: "DELETE",
     headers: authHeaders(),
   });
-  const json = await res.json();
-  if (!res.ok) throw new Error(json.error || "Failed to delete URL");
-  return json.data.result as Pick<ShortLink, "shortCode" | "targetUrl">;
+  const json = await safeJson(res);
+  if (!res.ok) throw new Error((json.error as string) || "Failed to delete URL");
+  return (json.data as any)?.result as Pick<ShortLink, "shortCode" | "targetUrl">;
 }
